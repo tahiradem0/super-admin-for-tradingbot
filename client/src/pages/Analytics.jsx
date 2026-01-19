@@ -3,6 +3,8 @@ import { useAuth } from '../App';
 
 const Analytics = () => {
     const { api } = useAuth();
+    const [stats, setStats] = useState(null);
+    const [profitHistory, setProfitHistory] = useState([]); // Initialize as empty array
     const [trades, setTrades] = useState([]);
     const [tradePeriod, setTradePeriod] = useState('day'); // 'day', 'week', 'month', 'all', 'custom'
     const [customDates, setCustomDates] = useState({ start: '', end: '' });
