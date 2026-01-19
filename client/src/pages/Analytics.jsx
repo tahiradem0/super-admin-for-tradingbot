@@ -41,26 +41,40 @@ const Analytics = () => {
 
         trades.forEach(trade => {
             // Use recorded gaps if available, otherwise estimate from raw prices
-            // Gaps are stored as decimals (e.g. 0.00005). We need to convert them to "Points".
-            // Assuming 1 Point = 0.00001 (standard for 5-digit broker).
-            // So 0.00005 becomes 5.0 points.
 
             let entryVal = parseFloat(trade.entry_gap) || 0;
             let exitVal = parseFloat(trade.exit_gap) || 0;
 
             // Fallback: If gap columns are empty, calculate from price difference
+            // If we calculate from RAW PRICES, the result will surely be a decimal (e.g. 1.2505 - 1.2500 = 0.0005)
+            // So we MUST flag this as a decimal to be converted later.
+            let computedFromPrice = false;
+
             if (entryVal === 0 && trade.hfm_entry_price && trade.equiti_entry_price) {
                 entryVal = Math.abs(trade.hfm_entry_price - trade.equiti_entry_price);
+                computedFromPrice = true;
             }
             if (exitVal === 0 && trade.hfm_exit_price && trade.equiti_exit_price) {
                 exitVal = Math.abs(trade.hfm_exit_price - trade.equiti_exit_price);
+                computedFromPrice = true;
             }
 
-            // Convert raw decimal difference to Points (assuming 5-digit pricing)
-            // If the user sees "5" in their head, it usually means 5 pips/points.
-            const pointMultiplier = 100000;
+            // Determine if we need to convert from Decimals to Points
+            // Case A: Calculated from price (0.00005) -> Needs * 100,000 to become 5.0
+            // Case B: Stored in DB as Points (5.0) -> No multiplier needed.
+            // Case C: Stored in DB as Decimals (0.00005) -> Needs * 100,000.
 
-            const tradePoints = (Math.abs(entryVal) + Math.abs(exitVal)) * pointMultiplier;
+            // Heuristic: If value is small (< 1), assume it's a decimal price difference.
+            // If value is >= 1, assume it's already in Points.
+            // If we computedFromPrice, we KNOW it's a decimal.
+
+            const convertEntry = computedFromPrice || entryVal < 0.9;
+            const convertExit = computedFromPrice || exitVal < 0.9;
+
+            const finalEntryPoints = convertEntry ? (entryVal * 100000) : entryVal;
+            const finalExitPoints = convertExit ? (exitVal * 100000) : exitVal;
+
+            const tradePoints = Math.abs(finalEntryPoints) + Math.abs(finalExitPoints);
 
             totalPointDiff += tradePoints;
         });
