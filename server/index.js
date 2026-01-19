@@ -356,6 +356,60 @@ app.get('/api/analytics/live-pnl', authenticateAdmin, async (req, res) => {
     }
 });
 
+// Get detailed trade analysis
+app.get('/api/analytics/trades', authenticateAdmin, async (req, res) => {
+    try {
+        const { period, startDate, endDate } = req.query; // 'day', 'week', 'month', or dates
+
+        let dateFilter = '';
+        const params = [];
+
+        if (startDate && endDate) {
+            dateFilter = 'AND th.entry_time >= $1 AND th.entry_time <= $2';
+            params.push(startDate, endDate);
+        } else if (period === 'day') {
+            dateFilter = 'AND th.entry_time >= CURRENT_DATE';
+        } else if (period === 'week') {
+            dateFilter = "AND th.entry_time >= NOW() - INTERVAL '7 days'";
+        } else if (period === 'month') {
+            dateFilter = "AND th.entry_time >= NOW() - INTERVAL '30 days'";
+        }
+
+        const query = `
+            SELECT 
+                th.id,
+                th.entry_time,
+                th.exit_time,
+                th.opportunity_type,
+                th.lot_size,
+                th.hfm_entry_price,
+                th.equiti_entry_price,
+                th.hfm_exit_price,
+                th.equiti_exit_price,
+                th.net_profit,
+                th.entry_gap,
+                th.exit_gap,
+                th.status,
+                u.username,
+                us.hfm_symbol,
+                us.equiti_symbol
+            FROM trade_history th
+            INNER JOIN users u ON th.user_id = u.id
+            LEFT JOIN user_settings us ON th.user_id = us.user_id
+            WHERE 1=1 ${dateFilter}
+            ORDER BY th.entry_time DESC
+            LIMIT 1000
+        `;
+
+        const result = await db.query(query, params);
+        res.json({ trades: result.rows });
+
+    } catch (err) {
+        console.error('Detailed trades error:', err);
+        res.status(500).json({ error: 'Failed to fetch trades' });
+    }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SYSTEM CONTROL ROUTES (Kill Switch, Blocked Times)
 // ═══════════════════════════════════════════════════════════════════════════════
