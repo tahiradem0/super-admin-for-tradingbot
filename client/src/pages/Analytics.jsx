@@ -388,71 +388,89 @@ const Analytics = () => {
                                 <th style={{ padding: '12px' }}>User</th>
                                 <th style={{ padding: '12px' }}>Pair</th>
                                 <th style={{ padding: '12px' }}>Type</th>
-                                <th style={{ padding: '12px' }}>HFM (In/Out/Diff)</th>
-                                <th style={{ padding: '12px' }}>Equiti (In/Out/Diff)</th>
+                                <th style={{ padding: '12px' }}>HFM (In/Out)</th>
+                                <th style={{ padding: '12px' }}>Equiti (In/Out)</th>
+                                <th style={{ padding: '12px' }}>Gaps (Entry/Exit)</th>
                                 <th style={{ padding: '12px', textAlign: 'right' }}>Profit</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loadingTrades ? (
                                 <tr>
-                                    <td colSpan="7" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    <td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
                                         Loading trades...
                                     </td>
                                 </tr>
                             ) : trades.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                                    <td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
                                         No trades found for this period
                                     </td>
                                 </tr>
                             ) : (
-                                trades.map(trade => (
-                                    <tr key={trade.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '13px' }}>
-                                        <td style={{ padding: '12px' }}>
-                                            {new Date(trade.entry_time).toLocaleString()}
-                                        </td>
-                                        <td style={{ padding: '12px', fontWeight: '500' }}>{trade.username}</td>
-                                        <td style={{ padding: '12px' }}>
-                                            <span style={{
-                                                display: 'block',
-                                                fontSize: '11px',
-                                                color: 'var(--text-muted)'
-                                            }}>
-                                                {trade.hfm_symbol || 'N/A'}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '12px' }}>
-                                            <span style={{
-                                                padding: '2px 6px',
-                                                borderRadius: '4px',
-                                                background: trade.opportunity_type?.includes('BUY') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                                                color: trade.opportunity_type?.includes('BUY') ? '#10b981' : '#ef4444',
-                                                fontSize: '11px',
-                                                fontWeight: '600'
-                                            }}>
-                                                {trade.opportunity_type || 'N/A'}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '12px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
-                                                <span>In: {formatPrice(trade.hfm_entry_price)}</span>
-                                                <span>Out: {formatPrice(trade.hfm_exit_price)}</span>
-                                                <span style={{ color: 'var(--text-muted)' }}>Diff: {calculateDifference(trade.hfm_exit_price, trade.hfm_entry_price)}</span>
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '12px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
-                                                <span>In: {formatPrice(trade.equiti_entry_price)}</span>
-                                                <span>Out: {formatPrice(trade.equiti_exit_price)}</span>
-                                                <span style={{ color: 'var(--text-muted)' }}>Diff: {calculateDifference(trade.equiti_exit_price, trade.equiti_entry_price)}</span>
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: trade.net_profit >= 0 ? '#10b981' : '#ef4444' }}>
-                                            {formatCurrency(trade.net_profit)}
-                                        </td>
-                                    </tr>
-                                ))
+                                trades.map(trade => {
+                                    // Calculate gaps for display if DB fields are empty
+                                    let entryGap = trade.entry_gap;
+                                    if (!entryGap && trade.hfm_entry_price && trade.equiti_entry_price) {
+                                        entryGap = Math.abs(parseFloat(trade.hfm_entry_price) - parseFloat(trade.equiti_entry_price)).toFixed(5);
+                                    }
+
+                                    let exitGap = trade.exit_gap;
+                                    if (!exitGap && trade.hfm_exit_price && trade.equiti_exit_price) {
+                                        exitGap = Math.abs(parseFloat(trade.hfm_exit_price) - parseFloat(trade.equiti_exit_price)).toFixed(5);
+                                    }
+
+                                    return (
+                                        <tr key={trade.id} style={{ borderBottom: '1px solid var(--border-color)', fontSize: '13px' }}>
+                                            <td style={{ padding: '12px' }}>
+                                                {new Date(trade.entry_time).toLocaleString()}
+                                            </td>
+                                            <td style={{ padding: '12px', fontWeight: '500' }}>{trade.username}</td>
+                                            <td style={{ padding: '12px' }}>
+                                                <span style={{
+                                                    display: 'block',
+                                                    fontSize: '11px',
+                                                    color: 'var(--text-muted)'
+                                                }}>
+                                                    {trade.hfm_symbol || 'N/A'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px' }}>
+                                                <span style={{
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    background: trade.opportunity_type?.includes('BUY') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                                    color: trade.opportunity_type?.includes('BUY') ? '#10b981' : '#ef4444',
+                                                    fontSize: '11px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {trade.opportunity_type || 'N/A'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                                                    <span>In: {formatPrice(trade.hfm_entry_price)}</span>
+                                                    <span>Out: {formatPrice(trade.hfm_exit_price)}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '12px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                                                    <span>In: {formatPrice(trade.equiti_entry_price)}</span>
+                                                    <span>Out: {formatPrice(trade.equiti_exit_price)}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '12px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px' }}>
+                                                    <span title="Entry Gap: |HFM In - Equiti In|">Entry: {entryGap ? parseFloat(entryGap).toFixed(5) : '-'}</span>
+                                                    <span title="Exit Gap: |HFM Out - Equiti Out|">Exit: {exitGap ? parseFloat(exitGap).toFixed(5) : '-'}</span>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600', color: trade.net_profit >= 0 ? '#10b981' : '#ef4444' }}>
+                                                {formatCurrency(trade.net_profit)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
