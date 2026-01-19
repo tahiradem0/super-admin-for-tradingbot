@@ -300,6 +300,62 @@ app.get('/api/analytics/profit-history', authenticateAdmin, async (req, res) => 
     }
 });
 
+// Get active bots (users with OPEN trades)
+app.get('/api/analytics/active-bots', authenticateAdmin, async (req, res) => {
+    try {
+        const result = await db.query(`
+      SELECT 
+        u.id,
+        u.username,
+        u.email,
+        th.opportunity_type,
+        th.lot_size,
+        th.hfm_entry_price,
+        th.equiti_entry_price,
+        th.entry_time,
+        th.entry_gap
+      FROM users u
+      INNER JOIN trade_history th ON u.id = th.user_id
+      WHERE th.status = 'OPEN'
+      ORDER BY th.entry_time DESC
+    `);
+
+        res.json({ activeBots: result.rows });
+    } catch (err) {
+        console.error('Active bots error:', err);
+        res.status(500).json({ error: 'Failed to fetch active bots' });
+    }
+});
+
+// Get recent completed trades (Live PnL Feed)
+app.get('/api/analytics/live-pnl', authenticateAdmin, async (req, res) => {
+    try {
+        const result = await db.query(`
+      SELECT 
+        th.id,
+        u.username,
+        u.email,
+        th.opportunity_type,
+        th.lot_size,
+        th.net_profit,
+        th.hold_duration,
+        th.exit_time,
+        th.entry_gap,
+        th.exit_gap
+      FROM trade_history th
+      INNER JOIN users u ON th.user_id = u.id
+      WHERE th.status = 'CLOSED' AND th.exit_time IS NOT NULL
+      ORDER BY th.exit_time DESC
+      LIMIT 50
+    `);
+
+        res.json({ trades: result.rows });
+    } catch (err) {
+        console.error('Live PnL error:', err);
+        res.status(500).json({ error: 'Failed to fetch live PnL' });
+    }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SYSTEM CONTROL ROUTES (Kill Switch, Blocked Times)
 // ═══════════════════════════════════════════════════════════════════════════════

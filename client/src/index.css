@@ -16,12 +16,12 @@
   --bg-tertiary: #1a1a24;
   --bg-card: rgba(26, 26, 36, 0.8);
   --bg-glass: rgba(255, 255, 255, 0.03);
-  
+
   /* Accent Colors */
   --accent-primary: #6366f1;
   --accent-secondary: #818cf8;
   --accent-glow: rgba(99, 102, 241, 0.3);
-  
+
   /* Status Colors */
   --success: #10b981;
   --success-glow: rgba(16, 185, 129, 0.3);
@@ -30,33 +30,33 @@
   --danger: #ef4444;
   --danger-glow: rgba(239, 68, 68, 0.4);
   --info: #3b82f6;
-  
+
   /* Text Colors */
   --text-primary: #ffffff;
   --text-secondary: rgba(255, 255, 255, 0.7);
   --text-muted: rgba(255, 255, 255, 0.4);
-  
+
   /* Borders */
   --border-color: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(99, 102, 241, 0.5);
-  
+
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
   --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   --gradient-dark: linear-gradient(180deg, #12121a 0%, #0a0a0f 100%);
-  
+
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 30px var(--accent-glow);
-  
+
   /* Transitions */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.3s ease;
   --transition-slow: 0.5s ease;
-  
+
   /* Border Radius */
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -68,7 +68,9 @@
    RESET & BASE
 ═══════════════════════════════════════════════════════════════════════════════ */
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -97,7 +99,7 @@ body::before {
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
+  background:
     radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.03) 0%, transparent 80%);
@@ -121,7 +123,9 @@ button {
   outline: none;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   font-family: inherit;
   outline: none;
 }
@@ -372,12 +376,25 @@ input, select, textarea {
   border-color: var(--border-glow);
 }
 
-.stat-card.success { --card-accent: var(--success); }
-.stat-card.warning { --card-accent: var(--warning); }
-.stat-card.danger { --card-accent: var(--danger); }
+.stat-card.success {
+  --card-accent: var(--success);
+}
 
-.stat-card.success::before { background: var(--gradient-success); }
-.stat-card.danger::before { background: var(--gradient-danger); }
+.stat-card.warning {
+  --card-accent: var(--warning);
+}
+
+.stat-card.danger {
+  --card-accent: var(--danger);
+}
+
+.stat-card.success::before {
+  background: var(--gradient-success);
+}
+
+.stat-card.danger::before {
+  background: var(--gradient-danger);
+}
 
 .stat-icon {
   width: 48px;
@@ -400,8 +417,13 @@ input, select, textarea {
   margin-bottom: 8px;
 }
 
-.stat-value.positive { color: var(--success); }
-.stat-value.negative { color: var(--danger); }
+.stat-value.positive {
+  color: var(--success);
+}
+
+.stat-value.negative {
+  color: var(--danger);
+}
 
 .stat-label {
   font-size: 14px;
@@ -603,12 +625,27 @@ tbody tr:hover {
   animation: pulse 2s infinite;
 }
 
-.status-dot.active { background: var(--success); }
-.status-dot.inactive { background: var(--danger); animation: none; }
+.status-dot.active {
+  background: var(--success);
+}
+
+.status-dot.inactive {
+  background: var(--danger);
+  animation: none;
+}
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.1); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -676,8 +713,15 @@ tbody tr:hover {
 }
 
 @keyframes killPulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .kill-switch-btn {
@@ -692,7 +736,7 @@ tbody tr:hover {
   text-transform: uppercase;
   cursor: pointer;
   transition: all var(--transition-normal);
-  box-shadow: 
+  box-shadow:
     0 0 40px rgba(239, 68, 68, 0.3),
     inset 0 -4px 20px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -706,7 +750,7 @@ tbody tr:hover {
 
 .kill-switch-btn:hover {
   transform: scale(1.05);
-  box-shadow: 
+  box-shadow:
     0 0 60px rgba(239, 68, 68, 0.5),
     inset 0 -4px 20px rgba(0, 0, 0, 0.3);
 }
@@ -716,8 +760,15 @@ tbody tr:hover {
 }
 
 @keyframes killActive {
-  0%, 100% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5); }
-  50% { box-shadow: 0 0 80px rgba(239, 68, 68, 0.8); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 80px rgba(239, 68, 68, 0.8);
+  }
 }
 
 .kill-switch-icon {
@@ -885,6 +936,7 @@ tbody tr:hover {
     opacity: 0;
     transform: scale(0.95) translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -989,7 +1041,9 @@ tbody tr:hover {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-text {
@@ -1027,16 +1081,16 @@ tbody tr:hover {
   .sidebar {
     transform: translateX(-100%);
   }
-  
+
   .sidebar.open {
     transform: translateX(0);
   }
-  
+
   .main-content {
     margin-left: 0;
     padding: 20px;
   }
-  
+
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1046,12 +1100,50 @@ tbody tr:hover {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .login-card {
     padding: 32px 24px;
   }
-  
+
   .modal {
     padding: 24px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LIVE MONITORING ANIMATIONS
+═══════════════════════════════════════════════════════════════════════════════ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.alpha {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.status-badge.beta {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
