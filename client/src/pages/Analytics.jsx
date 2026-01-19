@@ -33,29 +33,36 @@ const Analytics = () => {
         }
 
         // Calculate Total Point Difference
-        // "Total number of point difference" interpretation: 
-        // Sum of (HFM Exit - HFM Entry) + (Equiti Exit - Equiti Entry)
-        // OR simply Sum of (Price Exit - Price Entry) for all legs.
-        // We will calculate exact price difference points.
+        // User definition: Sum of 'points' where points = Entry deviation + Exit deviation
+        // Example: "entered in 5 points and exit by 4 points so that means it has 9 points"
+        // This maps perfectly to summing the absolute values of entry/exit gaps.
 
         let totalPointDiff = 0;
 
         trades.forEach(trade => {
-            const hfmDiff = trade.hfm_exit_price && trade.hfm_entry_price
-                ? (parseFloat(trade.hfm_exit_price) - parseFloat(trade.hfm_entry_price))
-                : 0;
+            // Use recorded gaps if available, otherwise estimate from raw prices
+            // Gaps are stored as decimals (e.g. 0.00005). We need to convert them to "Points".
+            // Assuming 1 Point = 0.00001 (standard for 5-digit broker).
+            // So 0.00005 becomes 5.0 points.
 
-            const equitiDiff = trade.equiti_exit_price && trade.equiti_entry_price
-                ? (parseFloat(trade.equiti_exit_price) - parseFloat(trade.equiti_entry_price))
-                : 0;
+            let entryVal = parseFloat(trade.entry_gap) || 0;
+            let exitVal = parseFloat(trade.exit_gap) || 0;
 
-            // Adjust based on Buy/Sell if needed, but "difference" usually implies purely mathematical delta
-            // If the user means "Profit Points", we should handle direction.
-            // Assuming "Point Difference" is just the gap captured.
-            // Let's sum the absolute differences if it's arbitrage, or raw if directional.
-            // Simplest safe bet: Sum of raw diffs.
+            // Fallback: If gap columns are empty, calculate from price difference
+            if (entryVal === 0 && trade.hfm_entry_price && trade.equiti_entry_price) {
+                entryVal = Math.abs(trade.hfm_entry_price - trade.equiti_entry_price);
+            }
+            if (exitVal === 0 && trade.hfm_exit_price && trade.equiti_exit_price) {
+                exitVal = Math.abs(trade.hfm_exit_price - trade.equiti_exit_price);
+            }
 
-            totalPointDiff += (hfmDiff + equitiDiff);
+            // Convert raw decimal difference to Points (assuming 5-digit pricing)
+            // If the user sees "5" in their head, it usually means 5 pips/points.
+            const pointMultiplier = 100000;
+
+            const tradePoints = (Math.abs(entryVal) + Math.abs(exitVal)) * pointMultiplier;
+
+            totalPointDiff += tradePoints;
         });
 
         // Formula: (Number of trades * constant) - (total point sum)
