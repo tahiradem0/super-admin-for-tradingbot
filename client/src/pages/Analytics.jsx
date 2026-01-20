@@ -13,7 +13,14 @@ const Analytics = () => {
 
     // IPO Calculator State
     const [ipoConstant, setIpoConstant] = useState(1);
-    const [ipoData, setIpoData] = useState({ score: 0, pointDiff: 0 });
+    const [ipoData, setIpoData] = useState({
+        score: 0,
+        totalLotGapProduct: 0,
+        totalLots: 0,
+        validTrades: 0,
+        skippedTrades: 0
+    });
+    const [failedTrades, setFailedTrades] = useState([]);
 
     useEffect(() => {
         fetchData();
@@ -26,66 +33,90 @@ const Analytics = () => {
     }, [tradePeriod]);
 
     // Calculate IPO whenever trades or constant changes
+    // NEW FORMULA: Total IPO = Σ(lot_size × points/gap) - (Total Lots × X)
+    // Only include valid trade pairs (both HFM and Equiti executed successfully)
     useEffect(() => {
         if (!trades.length) {
-            setIpoData({ score: 0, pointDiff: 0 });
+            setIpoData({
+                score: 0,
+                totalLotGapProduct: 0,
+                totalLots: 0,
+                validTrades: 0,
+                skippedTrades: 0
+            });
             return;
         }
 
-        // Calculate Total Point Difference
-        // User definition: Sum of 'points' where points = Entry deviation + Exit deviation
-        // Example: "entered in 5 points and exit by 4 points so that means it has 9 points"
-        // This maps perfectly to summing the absolute values of entry/exit gaps.
-
-        let totalPointDiff = 0;
+        let totalLotGapProduct = 0;  // Σ(lot_size × points)
+        let totalLots = 0;
+        let validTrades = 0;
+        let skippedTrades = 0;
+        let currentFailedTrades = [];
 
         trades.forEach(trade => {
-            // Use recorded gaps if available, otherwise estimate from raw prices
+            // VALIDATION: Check if trade is a valid pair (both HFM and Equiti executed)
+            // A valid trade must have both broker entry prices
+            const hasHfmEntry = trade.hfm_entry_price && parseFloat(trade.hfm_entry_price) > 0;
+            const hasEquitiEntry = trade.equiti_entry_price && parseFloat(trade.equiti_entry_price) > 0;
 
+            // Skip if this is an incomplete/failed pair (only 1 trade executed instead of 2)
+            if (!hasHfmEntry || !hasEquitiEntry) {
+                skippedTrades++;
+                currentFailedTrades.push(trade);
+                return; // Skip this trade - it's not a valid pair
+            }
+
+            const lotSize = parseFloat(trade.lot_size) || 0;
+            if (lotSize === 0) {
+                skippedTrades++;
+                return; // Skip trades with no lot size
+            }
+
+            // Calculate points/gap for this trade
             let entryVal = parseFloat(trade.entry_gap) || 0;
             let exitVal = parseFloat(trade.exit_gap) || 0;
 
             // Fallback: If gap columns are empty, calculate from price difference
-            // If we calculate from RAW PRICES, the result will surely be a decimal (e.g. 1.2505 - 1.2500 = 0.0005)
-            // So we MUST flag this as a decimal to be converted later.
             let computedFromPrice = false;
 
-            if (entryVal === 0 && trade.hfm_entry_price && trade.equiti_entry_price) {
-                entryVal = Math.abs(trade.hfm_entry_price - trade.equiti_entry_price);
+            if (entryVal === 0 && hasHfmEntry && hasEquitiEntry) {
+                entryVal = Math.abs(parseFloat(trade.hfm_entry_price) - parseFloat(trade.equiti_entry_price));
                 computedFromPrice = true;
             }
             if (exitVal === 0 && trade.hfm_exit_price && trade.equiti_exit_price) {
-                exitVal = Math.abs(trade.hfm_exit_price - trade.equiti_exit_price);
+                exitVal = Math.abs(parseFloat(trade.hfm_exit_price) - parseFloat(trade.equiti_exit_price));
                 computedFromPrice = true;
             }
 
-            // Determine if we need to convert from Decimals to Points
-            // Case A: Calculated from price (0.00005) -> Needs * 100,000 to become 5.0
-            // Case B: Stored in DB as Points (5.0) -> No multiplier needed.
-            // Case C: Stored in DB as Decimals (0.00005) -> Needs * 100,000.
-
-            // Heuristic: If value is small (< 1), assume it's a decimal price difference.
-            // If value is >= 1, assume it's already in Points.
-            // If we computedFromPrice, we KNOW it's a decimal.
-
+            // Convert to Points if value is in decimal format
+            // Heuristic: If value is small (< 1), it's a decimal price difference
             const convertEntry = computedFromPrice || entryVal < 0.9;
             const convertExit = computedFromPrice || exitVal < 0.9;
 
             const finalEntryPoints = convertEntry ? (entryVal * 100000) : entryVal;
             const finalExitPoints = convertExit ? (exitVal * 100000) : exitVal;
 
+            // Total points/gap for this trade = entry gap + exit gap
             const tradePoints = Math.abs(finalEntryPoints) + Math.abs(finalExitPoints);
 
-            totalPointDiff += tradePoints;
+            // Add to totals
+            totalLotGapProduct += (lotSize * tradePoints);  // lot_size × points
+            totalLots += lotSize;
+            validTrades++;
         });
 
-        // Formula: (Number of trades * constant) - (total point sum)
-        const score = (trades.length * parseFloat(ipoConstant || 0)) - totalPointDiff;
+        // NEW FORMULA: Total IPO = Σ(lot_size × points) - (Total Lots × X)
+        const score = totalLotGapProduct - (totalLots * parseFloat(ipoConstant || 0));
 
         setIpoData({
             score,
-            pointDiff: totalPointDiff
+            totalLotGapProduct,
+            totalLots,
+            validTrades,
+            skippedTrades
         });
+
+        setFailedTrades(currentFailedTrades);
 
     }, [trades, ipoConstant]);
 
@@ -267,62 +298,155 @@ const Analytics = () => {
                 <div className="card-header">
                     <div>
                         <h3 className="card-title">🚀 IPO Calculator</h3>
-                        <p className="card-subtitle">Performance Benchmark: (Trades × X) - Point Diff</p>
+                        <p className="card-subtitle">Performance Benchmark: Σ(Lots × Points) - (Total Lots × X)</p>
                     </div>
                 </div>
 
-                <div style={{ padding: '20px 0', display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div style={{ flex: 1, minWidth: '250px' }}>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
-                            Assessment Constant (X)
-                        </label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            value={ipoConstant}
-                            onChange={(e) => setIpoConstant(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--border-color)',
-                                background: 'var(--bg-primary)',
-                                color: 'var(--text-color)',
-                                fontSize: '16px'
-                            }}
-                        />
-                    </div>
-
-                    <div style={{ flex: 1, minWidth: '250px' }}>
-                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Equation Preview:</div>
-                        <div style={{ fontSize: '14px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
-                            ({trades.length} trades × {ipoConstant}) - {ipoData.pointDiff.toFixed(2)} pts
+                <div style={{ padding: '20px 0' }}>
+                    {/* Input and Formula Row */}
+                    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: '20px' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                                Constant (X) - Points per Lot
+                            </label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                value={ipoConstant}
+                                onChange={(e) => setIpoConstant(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-primary)',
+                                    color: 'var(--text-color)',
+                                    fontSize: '16px'
+                                }}
+                            />
                         </div>
-                    </div>
 
-                    <div style={{
-                        flex: '0 0 auto',
-                        background: 'var(--bg-primary)',
-                        padding: '15px 25px',
-                        borderRadius: '12px',
-                        textAlign: 'center',
-                        minWidth: '150px',
-                        border: '1px solid var(--border-color)'
-                    }}>
-                        <div style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '1px' }}>
-                            IPO Score
+                        <div style={{ flex: 2, minWidth: '300px' }}>
+                            <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Equation Preview:</div>
+                            <div style={{ fontSize: '14px', fontFamily: 'monospace', color: 'var(--text-muted)', background: 'var(--bg-primary)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                <div style={{ marginBottom: '4px' }}>
+                                    <span style={{ color: 'var(--primary-color)' }}>{ipoData.totalLotGapProduct.toFixed(2)}</span>
+                                    <span> - </span>
+                                    <span>({ipoData.totalLots.toFixed(2)} lots × {ipoConstant})</span>
+                                </div>
+                                <div style={{ fontSize: '12px', opacity: 0.7 }}>
+                                    = {ipoData.totalLotGapProduct.toFixed(2)} - {(ipoData.totalLots * parseFloat(ipoConstant || 0)).toFixed(2)} = <strong style={{ color: ipoData.score >= 0 ? 'var(--success)' : '#ef4444' }}>{ipoData.score.toFixed(2)}</strong>
+                                </div>
+                            </div>
                         </div>
+
                         <div style={{
-                            fontSize: '32px',
-                            fontWeight: '800',
-                            color: ipoData.score >= 0 ? 'var(--primary-color)' : '#ef4444',
-                            marginTop: '4px'
+                            flex: '0 0 auto',
+                            background: 'var(--bg-primary)',
+                            padding: '15px 25px',
+                            borderRadius: '12px',
+                            textAlign: 'center',
+                            minWidth: '150px',
+                            border: '1px solid var(--border-color)'
                         }}>
-                            {ipoData.score.toFixed(2)}
+                            <div style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '1px' }}>
+                                IPO Score
+                            </div>
+                            <div style={{
+                                fontSize: '32px',
+                                fontWeight: '800',
+                                color: ipoData.score >= 0 ? 'var(--primary-color)' : '#ef4444',
+                                marginTop: '4px'
+                            }}>
+                                {ipoData.score.toFixed(2)}
+                            </div>
                         </div>
                     </div>
+
+                    {/* Stats Row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px', padding: '16px', background: 'var(--bg-primary)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Valid Pairs</div>
+                            <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--success)' }}>{ipoData.validTrades}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Skipped (Incomplete)</div>
+                            <div style={{ fontSize: '20px', fontWeight: '700', color: ipoData.skippedTrades > 0 ? '#ef4444' : 'var(--text-color)' }}>{ipoData.skippedTrades}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Lots</div>
+                            <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--primary-color)' }}>{ipoData.totalLots.toFixed(2)}</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>Σ(Lot × Points)</div>
+                            <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--warning)' }}>{ipoData.totalLotGapProduct.toFixed(2)}</div>
+                        </div>
+                    </div>
+
+                    {/* Info Note */}
+                    {ipoData.skippedTrades > 0 && (
+                        <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', fontSize: '12px', color: '#ef4444' }}>
+                            ⚠️ {ipoData.skippedTrades} trade(s) excluded - incomplete pairs (only 1 of 2 trades executed)
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* Failed Trades Report - ONLY ONE BROKER EXECUTED */}
+            {failedTrades.length > 0 && (
+                <div className="card" style={{ marginBottom: '24px', border: '1px solid #ef4444', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
+                    <div className="card-header">
+                        <div>
+                            <h3 className="card-title" style={{ color: '#ef4444' }}>⚠️ Failed / Incomplete Trades</h3>
+                            <p className="card-subtitle" style={{ color: '#f87171' }}>Trades excluding from IPO (One broker failed to execute)</p>
+                        </div>
+                    </div>
+                    <div className="table-container" style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '2px solid #ef4444', textAlign: 'left', fontSize: '12px', color: '#ef4444' }}>
+                                    <th style={{ padding: '12px' }}>Time</th>
+                                    <th style={{ padding: '12px' }}>User</th>
+                                    <th style={{ padding: '12px' }}>Type</th>
+                                    <th style={{ padding: '12px' }}>HFM Execution</th>
+                                    <th style={{ padding: '12px' }}>Equiti Execution</th>
+                                    <th style={{ padding: '12px' }}>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {failedTrades.map(trade => {
+                                    const hasHfm = trade.hfm_entry_price && parseFloat(trade.hfm_entry_price) > 0;
+                                    const hasEquiti = trade.equiti_entry_price && parseFloat(trade.equiti_entry_price) > 0;
+                                    return (
+                                        <tr key={trade.id} style={{ borderBottom: '1px solid #fecaca', fontSize: '13px', background: 'rgba(239, 68, 68, 0.05)' }}>
+                                            <td style={{ padding: '12px', color: '#b91c1c' }}>{new Date(trade.entry_time).toLocaleString()}</td>
+                                            <td style={{ padding: '12px', color: '#b91c1c', fontWeight: '500' }}>{trade.username}</td>
+                                            <td style={{ padding: '12px', color: '#b91c1c' }}>{trade.opportunity_type}</td>
+                                            <td style={{ padding: '12px' }}>
+                                                {hasHfm ?
+                                                    <span style={{ color: '#15803d', fontWeight: '600' }}>✅ {formatPrice(trade.hfm_entry_price)}</span> :
+                                                    <span style={{ color: '#ef4444', fontWeight: '800' }}>❌ FAILED</span>
+                                                }
+                                            </td>
+                                            <td style={{ padding: '12px' }}>
+                                                {hasEquiti ?
+                                                    <span style={{ color: '#15803d', fontWeight: '600' }}>✅ {formatPrice(trade.equiti_entry_price)}</span> :
+                                                    <span style={{ color: '#ef4444', fontWeight: '800' }}>❌ FAILED</span>
+                                                }
+                                            </td>
+                                            <td style={{ padding: '12px' }}>
+                                                <span style={{ padding: '4px 8px', borderRadius: '4px', background: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 'bold' }}>
+                                                    INVALID PAIR
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
 
             {/* Detailed Trade Analysis */}
             <div className="card" style={{ marginBottom: '24px' }}>
